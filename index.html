@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VIS</title>
+
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://yui-s.yahooapis.com/pure/0.5.0/pure-min.css">
+    <link rel="stylesheet" href="https://rawgit.com/tpreusse/radar-chart-d3/master/src/radar-chart.css">
+
+    <script defer src="static/all.min.js"></script>
+
+    <script src="static/js.cookie-2.2.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.min.js"></script>
+    <script src="static/jquery-3.5.0.min.js"></script>
+    <link rel="stylesheet" href="static/jquery-ui.min.css">
+
+    <script src="static/jquery-ui.min.js"></script>
+    <script src="static/paper-full.js"></script>
+    <script src="static/d3-lasso.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
+    <script src="https://rawgit.com/tpreusse/radar-chart-d3/master/src/radar-chart.js"></script>
+
+    <style>
+        body {
+            background-color: lightgray;
+        }
+
+        .card {
+            width: 100%;
+        }
+
+        .card-header {
+            height: 55px;
+            background-color: white;
+        }
+
+        .card-body {
+            padding-left: 0px;
+            padding-right: 0px;
+            padding-top: 0px;
+            padding-bottom: 0px;
+        }
+
+
+
+
+        .node {
+            cursor: pointer;
+        }
+
+        .node circle {
+            fill: #fff;
+            stroke: steelblue;
+            stroke-width: 3px;
+        }
+
+        .node text {
+            font: 12px sans-serif;
+        }
+
+        .link {
+            fill: none;
+            stroke: #ccc;
+            stroke-width: 2px;
+        }
+
+
+
+        .radar-chart .area {
+            fill-opacity: 0.7;
+        }
+
+        .radar-chart.focus .area {
+            fill-opacity: 0.3;
+        }
+
+        .radar-chart.focus .area.focused {
+            fill-opacity: 0.9;
+        }
+
+
+
+        .not_possible {
+            fill: rgb(200, 200, 200);
+        }
+
+        .possible {
+            fill: #EC888C;
+        }
+
+        .selected {
+            fill: steelblue;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        button,
+        input,
+        select {
+            height: 35px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid h-100" style="padding-top:5px; padding-bottom:5px;">
+        <div class="row h-100">
+
+
+
+            <div class="col-6" style="padding-left:5px; padding-right:5px;">
+
+                <div class="card h-100">
+                    <div class="card-header">
+                        <b>Category Tree</b>
+                        <div class="float-right">
+                            <div class="form-inline">
+
+                                <input type="number" id="size" class="form-control" placeholder="Minimum Size" style="width:200px;">
+
+                                <button type="button" onclick="filter();" class="btn btn-outline-dark" style="margin-left: 5px;">Filter</button>
+
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body h-100" id="container_tree">
+                        <svg id="tree"></svg>
+                    </div>
+                </div>
+
+            </div>
+
+
+
+
+
+
+            <div class="col-6" style="padding-left:0px; padding-right:5px;">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <b>Category Comparison</b>
+                    </div>
+                    <div class="card-body" id="container_line" style="text-align:center;">
+                        <svg id="radar"></svg>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="tree.js"></script>
+    <script src="radar.js"></script>
+    <script type="text/javascript">
+        let data, dataRadar = [], dataTree = [], dataHeight = [];
+
+        function getChildren(children_ids, parent_id, minCnt) {
+            let res = []
+            children_ids.forEach(id => {
+                if (data[id].subtreeProductCount >= minCnt) {
+                    res.push({
+                        id: id,
+                        name: data[id].name,
+                        parent: parent_id,
+                        children: getChildren(JSON.parse(data[id].children), parent_id, minCnt),
+                        size: data[id].productCount,
+                        total_size: data[id].subtreeProductCount,
+                        similar_categories: data[id].alsoCount,
+                        similar_number: JSON.parse(data[id].also.replaceAll("(", "[").replaceAll(")", "]")).map(element => element[1]).reduce(function (a, b) {
+                            return a + b;
+                        }, 0),
+                        similar_map: Object.fromEntries(new Map(JSON.parse(data[id].also.replaceAll("(", "[").replaceAll(")", "]")))),
+                    })
+                }
+            })
+            if (res.length == 0) {
+                res = null
+            }
+            return res
+        }
+
+
+        d3.csv("all-nodes.csv", function (data_) {
+            data = data_
+            updateVIS(0)
+        })
+
+        function filter() {
+            let minCnt = parseFloat(document.getElementById('size').value)
+            console.log(minCnt)
+            updateVIS(minCnt)
+        }
+
+        function updateVIS(minCnt) {
+            root = {
+                id: 0,
+                name: data[0].name,
+                parent: null,
+                children: getChildren(JSON.parse(data[0].children), 0, minCnt),
+                size: data[0].productCount,
+                total_size: data[0].subtreeProductCount,
+                similar_categories: data[0].alsoCount,
+                similar_number: JSON.parse(data[0].also.replaceAll("(", "[").replaceAll(")", "]")).map(element => element[1]).reduce(function (a, b) {
+                    return a + b;
+                }, 0),
+                similar_map: Object.fromEntries(new Map(JSON.parse(data[0].also.replaceAll("(", "[").replaceAll(")", "]")))),
+            }
+            console.log(root)
+            root.x0 = height_tree / 2;
+            root.y0 = 0;
+            root.children.forEach(collapse);
+            update(root);
+
+            /*let data_radar = []
+            data_radar.push(formRadarData(root.children[5]))
+            data_radar.push(formRadarData(root.children[10]))
+            data_radar.push(formRadarData(root.children[15]))
+            render_radar(data_radar)*/
+        }
+
+
+
+    </script>
+
+</body>
+
+</html>
